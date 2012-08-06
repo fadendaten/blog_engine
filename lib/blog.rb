@@ -1,9 +1,13 @@
 require 'sinatra/base'
 require 'article_parser'
 require 'github_hook'
+require 'comment'
 require 'rdiscount'
 
-class Blog < Sinatra::Base  
+DataMapper::setup(:default, "sqlite3://#{Dir.pwd}/blog.db")
+DataMapper.finalize.auto_upgrade!
+
+class Blog < Sinatra::Base
   include ArticleParser
   
   use GithubHook if production?
@@ -20,7 +24,8 @@ class Blog < Sinatra::Base
     articles << article
     
     get "/#{article.slug}" do
-      erb :post, :locals => { :article => article }
+      @comments = Comment.for_article article
+      erb :post, :locals => { :article => article, :display_comments => true }
     end
   end
   
@@ -39,6 +44,12 @@ class Blog < Sinatra::Base
     article = write_article params[:article]
     settings.articles << article
     redirect '/'
+  end
+  
+  post '/comment' do
+    c = Comment.new params[:comment]
+    c.save
+    redirect "/#{params[:comment][:article_slug]}"
   end
   
 end
